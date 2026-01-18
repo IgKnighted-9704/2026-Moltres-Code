@@ -182,7 +182,7 @@ public class ShooterSubsystem extends SubsystemBase{
                     shooterAngle.setVoltage(MathUtil.clamp(anglePID, -6, 6));
             //Set Global Constants
                 Constants.ShooterSubsystemConstants.desiredVelReached = 
-                    Constants.UtilMethods.checkTolerance(desired_Angle, getShooterVelocityMeters(), Constants.ShooterSubsystemConstants.SPEED_TOLERANCE);
+                    Constants.UtilMethods.checkTolerance(desired_Angle, getShooterVelocityMeters(), Constants.ShooterSubsystemConstants.SPEED_TOLERANCE) && getShooterVelocityMeters() > 0;
                 Constants.ShooterSubsystemConstants.desiredAngleReached = 
                     Constants.UtilMethods.checkTolerance(desired_Angle, getShooterAngleDegrees(), Constants.ShooterSubsystemConstants.ANGLE_TOLERANCE);
             //Vision
