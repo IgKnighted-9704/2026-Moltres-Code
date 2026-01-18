@@ -1,0 +1,137 @@
+package frc.robot.subsystems.swervesubsystem;
+
+import com.ctre.phoenix6.hardware.TalonFX;
+import com.revrobotics.RelativeEncoder;
+import com.revrobotics.spark.SparkAbsoluteEncoder;
+import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.SparkLowLevel.MotorType;
+
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
+import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
+import frc.robot.Constants;
+public class SwerveModule{
+
+    //Drive & Angle Motors
+    private final TalonFX driveMotor;
+    private final SparkMax angleMotor;
+    
+    //Drive & Angle Encoders
+    private final SparkAbsoluteEncoder angleEncoder;
+    private final RelativeEncoder driveEncoder;
+
+    private final boolean angleMotorReversed;
+     private final double angleMotorOffsetRot;
+    private final boolean driveMotorReversed;
+
+    private PIDController anglePIDController;
+    private PIDController drivePIDController;
+    private SimpleMotorFeedforward driveFeedforward;
+
+    public SwerveModule(int driveMotorID, int angleMotorID, boolean driveMotorReversed, boolean angleMotorReversed, double angleMotorOffsetRot){
+        this.driveMotor = new TalonFX(driveMotorID);
+        this.angleMotor = new SparkMax(angleMotorID, MotorType.kBrushless);
+        this.angleMotorOffsetRot = angleMotorOffsetRot;
+
+        this.angleEncoder = angleMotor.getAbsoluteEncoder(); //Spark Absolute Encoder - Neo
+        this.driveEncoder = angleMotor.getEncoder(); //Spark Relative Encoder - Kraken
+
+        this.angleMotorReversed = angleMotorReversed;
+        this.driveMotorReversed = driveMotorReversed;
+
+        //Drive PID Initialization
+        drivePIDController = new PIDController(Constants.SwerveConstants.ModuleConstants.kPDriving, 
+                                              Constants.SwerveConstants.ModuleConstants.kIDriving,
+                                              Constants.SwerveConstants.ModuleConstants.kDDriving);
+        //Drive Feedforward Initialization
+        driveFeedforward = new SimpleMotorFeedforward(Constants.SwerveConstants.ModuleConstants.kSDriving, 
+                                                     Constants.SwerveConstants.ModuleConstants.kVDriving, 
+                                                     Constants.SwerveConstants.ModuleConstants.kADriving);
+        //Angle PID Initialization 
+        anglePIDController = new PIDController(Constants.SwerveConstants.ModuleConstants.kPTurning, 
+                                               Constants.SwerveConstants.ModuleConstants.kITurning,
+                                               Constants.SwerveConstants.ModuleConstants.kDTurning);
+
+        //Rather then using the max and min input range as constraints, it considers them to be the same point and automatically calculates the shortest route to the setpoint.
+        anglePIDController.enableContinuousInput(-Math.PI, Math.PI);
+        resetEncoders();
+
+    }
+
+    public double getDrivePosition(){
+        return driveMotorReversed ? driveEncoder.getPosition() * -1 * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2Meters :
+                                   driveEncoder.getPosition() * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2Meters;
+    }
+
+    public double getAngularPosition(){
+        return angleMotorReversed ? 
+        -1 * (angleEncoder.getPosition() - angleMotorOffsetRot) * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2Rad : 
+        (angleEncoder.getPosition() - angleMotorOffsetRot) * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2Rad;
+    }
+
+    public double getDriveVelocity(){
+        return driveMotorReversed ? driveEncoder.getVelocity() * -1 * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2MetersPerSec :
+                                   driveEncoder.getVelocity() * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2MetersPerSec;
+    }
+
+    public double getAngularVelocity(){
+        return angleMotorReversed ? 
+        -1 * angleEncoder.getVelocity() * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2RadPerSec : 
+        angleEncoder.getVelocity() * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2RadPerSec;
+    }
+
+   public SwerveModuleState getState(){
+        return new SwerveModuleState(getDriveVelocity(), new Rotation2d(getAngularPosition()));
+   }
+
+   public SwerveModulePosition getPosition(){
+        return new SwerveModulePosition(getDrivePosition(), new Rotation2d(getAngularPosition()));
+   }
+
+   public PIDController getDrivePID(){
+        return drivePIDController; 
+   }
+
+   public PIDController getAngularPID(){
+        return anglePIDController;
+   }
+
+   public SimpleMotorFeedforward getSimpleMotorFeedforward(){
+        return driveFeedforward;
+   }
+
+   public void setDrivePID(double kP, double kI, double kD){
+        drivePIDController.setPID(kP, kI, kD);
+   }
+
+   public void setAngularPID(double kP, double kI, double kD){
+        anglePIDController.setPID(kP, kI, kD);
+   }
+   public void setDriveFeedForward(double kS, double kV, double kA){
+        driveFeedforward = new SimpleMotorFeedforward(kS, kV, kA);
+   }
+
+    public void resetEncoders(){
+        driveEncoder.setPosition(0);
+    }
+   public void setDesiredState(SwerveModuleState state){
+        if(Math.abs(state.speedMetersPerSecond) < 0.001){
+            stop();
+            return;
+        }
+        state.optimize(getState().angle);
+            double totalSpeed = drivePIDController.calculate(getDriveVelocity(), state.speedMetersPerSecond) + 
+                                driveFeedforward.calculate(state.speedMetersPerSecond);
+            double targetAngle = Math.IEEEremainder(state.angle.getRadians(), 2 * Math.PI);
+        driveMotor.setVoltage(totalSpeed);
+        angleMotor.setVoltage(anglePIDController.calculate(getAngularPosition(),targetAngle));
+   }
+
+   public void stop(){
+        driveMotor.setVoltage(0);
+        angleMotor.set(0);
+   }
+
+}
