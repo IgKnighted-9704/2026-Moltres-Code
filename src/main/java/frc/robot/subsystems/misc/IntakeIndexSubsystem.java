@@ -28,7 +28,7 @@ public class IntakeIndexSubsystem extends SubsystemBase {
         private boolean maxFuelReached;
         private double desiredPivotAngle;
     //Data
-        private ShuffleboardTab IntakeIndexerSubsystemTab = Shuffleboard.getTab("Fuel Detected Indexer");
+        private ShuffleboardTab IntakeIndexerSubsystemTab = Shuffleboard.getTab("Intake Indexer Subsystem Tab");
         private GenericEntry fuelDetectedIndexerEntry;
         private GenericEntry fuelDetectedIntakeEntry;
         private GenericEntry maxFuelReachedEntry;
@@ -49,7 +49,6 @@ public class IntakeIndexSubsystem extends SubsystemBase {
             maxFuelReachedEntry = IntakeIndexerSubsystemTab.add("Max Fuel Reached", false).getEntry();
             desiredPivotAngleEntry = IntakeIndexerSubsystemTab.add("Desired Pivot Angle", 0.0).getEntry();
             currentPivotAngleEntry = IntakeIndexerSubsystemTab.add("Current Pivot Angle", 0.0).getEntry();
-
     }
 
     //Utility Methods
@@ -71,17 +70,26 @@ public class IntakeIndexSubsystem extends SubsystemBase {
             intakeMotor.set(0);
         }
 
-        public void kick(ShooterSubsystem shooter){
-            if(fuelDetectedIndexer && (Constants.ShooterSubsystemConstants.desiredAngleReached && Constants.ShooterSubsystemConstants.desiredVelReached)){
-                kickerMotor.set(Constants.IntakeIndexerSubsystemConstants.KICKER_SPEED);
-            }
-        }
-
         public void setDesired_Angle(double angle){
             desiredPivotAngle = angle;
         }
 
     //Command Based Methods
+        
+        public Command kick(){
+            return Commands.sequence(
+                Commands.runOnce(()->{
+                     if(fuelDetectedIndexer && (Constants.ShooterSubsystemConstants.desiredAngleReached && Constants.ShooterSubsystemConstants.desiredVelReached)){
+                        kickerMotor.set(Constants.IntakeIndexerSubsystemConstants.KICKER_SPEED);
+                    }
+                }),
+                Commands.waitUntil(()->!fuelDetectedIndexer),
+                Commands.runOnce(()->{
+                    kickerMotor.set(0);
+                })
+            );
+        }
+
         public Command intakeCommand(){
             return Commands.parallel(
                 Commands.runOnce(()->{
@@ -116,10 +124,17 @@ public class IntakeIndexSubsystem extends SubsystemBase {
         //Pivot Angle
             double pPID = pivotPID.calculate(getIntakeAngle(), desiredPivotAngle);
                 intakePivot.setVoltage(pPID);
+        //Indexer
+            if(fuelDetectedIndexer && (Constants.ShooterSubsystemConstants.desiredAngleReached && Constants.ShooterSubsystemConstants.desiredVelReached)){
+                kickerMotor.set(Constants.IntakeIndexerSubsystemConstants.KICKER_SPEED);
+            } else {
+                kickerMotor.set(0);
+            }
         //Data
             fuelDetectedIndexerEntry.setBoolean(fuelDetectedIndexer);
             fuelDetectedIntakeEntry.setBoolean(fuelDetectedIntake);
             maxFuelReachedEntry.setBoolean(maxFuelReached);
             desiredPivotAngleEntry.setDouble(desiredPivotAngle);
+            currentPivotAngleEntry.setDouble(getIntakeAngle());
     }
 }
