@@ -17,6 +17,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
+import frc.robot.Constants.ShooterSubsystemConstants;
 import frc.robot.subsystems.utility.LimelightHelpers;
 import frc.robot.subsystems.utility.LimelightHelpers.LimelightResults;
 import frc.robot.subsystems.utility.LimelightHelpers.LimelightTarget_Fiducial;
@@ -57,6 +58,12 @@ public class ShooterSubsystem extends SubsystemBase{
             private final GenericEntry targetHeightEntry;
             private final GenericEntry subsystemStateEntry;
             private final GenericEntry visionStateEntry;
+            private GenericEntry shooterSpeed_kP;
+            private GenericEntry shooterSpeed_kI;
+            private GenericEntry shooterSpeed_kD;
+            private GenericEntry shooterSpeed_kS;
+            private GenericEntry shooterSpeed_kV;
+
 
     //Tracker Variables
        private boolean enableSubsystem;
@@ -85,6 +92,11 @@ public class ShooterSubsystem extends SubsystemBase{
                 targetHeightEntry = ShooterSubsystemTab.add("Target Height", 0.0).getEntry();
                 subsystemStateEntry = ShooterSubsystemTab.add("Subsystem State", true).getEntry();
                 visionStateEntry = ShooterSubsystemTab.add("Vision State", false).getEntry();
+                shooterSpeed_kP = ShooterSubsystemTab.add("SHOOTER KP", shooterSpeedPID.getP()).getEntry();
+                shooterSpeed_kI = ShooterSubsystemTab.add("SHOOTER KI", shooterSpeedPID.getI()).getEntry();
+                shooterSpeed_kD = ShooterSubsystemTab.add("SHOOTER KD", shooterSpeedPID.getD()).getEntry();
+                shooterSpeed_kS = ShooterSubsystemTab.add("SHOOTER KS", shooterSpeedFF.getKs()).getEntry();
+                shooterSpeed_kV = ShooterSubsystemTab.add("SHOOTER KV", shooterSpeedFF.getKv()).getEntry();
        }
 
     //Utility Methods
@@ -97,7 +109,7 @@ public class ShooterSubsystem extends SubsystemBase{
         }
 
         private double getShooterAngleDegrees(){
-            return shooterAngleEncoder.getPosition() * 360;
+            return (shooterAngleEncoder.getPosition() - ShooterSubsystemConstants.SHOOTER_ANGLE_OFFSET) * 360;
         }
     //Subsystem Methods
         public void enableSubsystem(){
@@ -112,7 +124,7 @@ public class ShooterSubsystem extends SubsystemBase{
             enableVision = true;
         }
 
-        public void setVelocity(double velocity){
+        public void setDesiredVelocity(double velocity){
             desired_Velocity = velocity;
         }
 
@@ -138,12 +150,12 @@ public class ShooterSubsystem extends SubsystemBase{
                 //(sqrt(2ax)/sin(θ)) cos(θ) = u
             //Overall
                 // X Velocity =  (sqrt(2ax)/sin(θ)) cos(θ)
-                // Y Velocity = (sqrt(2ax)/sin(θ))
+                // Y Velocity = (sqrt(2ax))
                 
         public double generateVelocity(){
             double angle = Math.atan2(target_height, target_distance);
-            double yVel = Math.sqrt(2 * 9.80665 * target_height)/Math.sin(angle);
-            double xVel = (Math.sqrt(2 * 9.80665 * target_height)/Math.sin(angle)) * Math.cos(angle);
+            double yVel = Math.sqrt(2 * 9.80665 * target_height);
+            double xVel = (angle > 0) ? (Math.sqrt(2 * 9.80665 * target_height)/Math.sin(angle)) * Math.cos(angle) : 0;
                 double velocity = Math.hypot(xVel, yVel);
             return velocity;
         }
@@ -162,31 +174,34 @@ public class ShooterSubsystem extends SubsystemBase{
         }
 
         public Command setAngleAndVelocityCommand(double angle, double velocity){
-            return Commands.runOnce(()->{
+            if(!enableVision){
+                return Commands.runOnce(()->{
                         this.setDesired_Angle(angle);
-                        this.setVelocity(velocity);
-                    });
+                        this.setDesiredVelocity(velocity);
+                });
+            }
+            return Commands.none();
         }
 
     @Override
     public void periodic(){
         if(enableSubsystem){
-            boolean foundTarget = false;
             //Shooter Speed 
                 double sPID = shooterSpeedPID.calculate(getShooterVelocityMeters(), desired_Velocity);
                 double sFF = shooterSpeedFF.calculate(desired_Velocity);
                     shooterA.setVoltage(MathUtil.clamp(sPID + sFF, -12, 12));
-                    shooterB.setVoltage(MathUtil.clamp(sPID + sFF, -12, 12));
+                    shooterB.setVoltage(-MathUtil.clamp(sPID + sFF, -12, 12));
             //Shooter Angle
                 double anglePID = shooterAnglePID.calculate(getShooterAngleDegrees(), desired_Angle);
                     shooterAngle.setVoltage(MathUtil.clamp(anglePID, -6, 6));
             //Set Global Constants
                 Constants.ShooterSubsystemConstants.desiredVelReached = 
-                    Constants.UtilMethods.checkTolerance(desired_Angle, getShooterVelocityMeters(), Constants.ShooterSubsystemConstants.SPEED_TOLERANCE);
+                    Constants.UtilMethods.checkTolerance(desired_Velocity, getShooterVelocityMeters(), Constants.ShooterSubsystemConstants.SPEED_TOLERANCE);
                 Constants.ShooterSubsystemConstants.desiredAngleReached = 
                     Constants.UtilMethods.checkTolerance(desired_Angle, getShooterAngleDegrees(), Constants.ShooterSubsystemConstants.ANGLE_TOLERANCE);
             //Vision
             if(enableVision){
+                boolean foundTarget = false;
                 LimelightResults results = LimelightHelpers.getLatestResults("limeLight");
                 if(results.targets_Fiducials.length > 0){
                     for(LimelightTarget_Fiducial tag : results.targets_Fiducials){
@@ -200,8 +215,8 @@ public class ShooterSubsystem extends SubsystemBase{
                         }
                     }
                 if(foundTarget){
-                   desired_Angle = Units.radiansToDegrees(Math.atan2(target_height, target_distance));
-                   desired_Velocity = generateVelocity(); 
+                  setDesired_Angle(Units.radiansToDegrees(Math.atan2(target_height, target_distance)));
+                  setDesiredVelocity(generateVelocity());
                 }
             }
             //Data
@@ -213,6 +228,11 @@ public class ShooterSubsystem extends SubsystemBase{
                 targetHeightEntry.setDouble(target_height);
                 subsystemStateEntry.setBoolean(enableSubsystem);
                 visionStateEntry.setBoolean(enableVision);
+            //Change PID Values
+                shooterSpeedPID.setPID(shooterSpeed_kP.getDouble(shooterSpeedPID.getP()), shooterSpeed_kI.getDouble(shooterSpeedPID.getI()), shooterSpeed_kD.getDouble(shooterSpeedPID.getD()));
+            //Change Feedforward Values
+                shooterSpeedFF.setKs(shooterSpeed_kS.getDouble(shooterSpeedFF.getKs()));
+                shooterSpeedFF.setKv(shooterSpeed_kV.getDouble(shooterSpeedFF.getKv()));
         }
 
     }

@@ -11,6 +11,7 @@ import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.Odometry;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
@@ -218,6 +219,10 @@ public class SwerveSubsystem extends SubsystemBase {
         }
 
     //Swerve Data Acess
+        //Gyroscope
+        public Rotation3d getGyro(){
+            return gyroscope.getRotation3d();
+        }
         //Gyroscope Heading
         public double getHeading(){
                 return Math.IEEEremainder(gyroscope.getYaw().getValueAsDouble(), 360);

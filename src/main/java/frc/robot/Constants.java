@@ -12,6 +12,33 @@ public class Constants {
             public static final int HOPPER_MAX_LIMIT_SENSOR_ID = 0;
         }
 
+        public static class ClimbSubsystemConstants{
+            public static final int CLIMBMOTOR_A = 0;
+            public static final int CLIMBMOTOR_B = 0;
+
+            //SPEED CONSTANTS
+                public static final double CLIMB_MANUAL_SPEED = 0;
+                public static final double CLIMB_MAX_VELOCITY = 0;
+                public static final double CLIMB_MAX_ACCELERATION = 0;
+            //PID - Climb
+                public static double CLIMB_kP = 0;
+                public static double CLIMB_kI = 0;
+                public static double CLIMB_kD = 0;
+            //FEEDFORWARD - Climb
+                public static double CLIMB_kS = 0;
+                public static double CLIMB_kG = 0;
+                public static double CLIMB_kV = 0;
+                public static double Climb_kA = 0;
+
+            //HARDWARE CONSTANTS
+                public static double CLIMB_WHEEL_RADIUS_INCHES = 0;
+            
+            //CLIMB HEIGHT CONSTRAINTS
+                public static double MAX_INCHES = 0;
+                public static double MIN_INCHES = 0;
+        
+        }
+
         public static class IntakeIndexerSubsystemConstants{
             public static final int INTAKE_MOTOR_ID = 0;
             public static final int INTAKE_PIVOT_MOTOR_ID = 0;
@@ -52,6 +79,7 @@ public class Constants {
             //HARDWARE CONSTANTS
                 public static double FLYWHEEL_RADIUS_METERS = 0;
                 public static double SHOOTER_FLYWHEEL_GEAR_RATIO = 0;
+                public static double SHOOTER_ANGLE_OFFSET = 0;
             //SHOOTER ANGLE CONSTRAINTS
                 public static double MAX_ANGLE = 0;
                 public static double MIN_ANGLE = 0;

@@ -11,6 +11,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
+import frc.robot.subsystems.utility.Sensors;
 
 public class IntakeIndexSubsystem extends SubsystemBase {
     
@@ -27,6 +28,7 @@ public class IntakeIndexSubsystem extends SubsystemBase {
         private boolean fuelDetectedIndexer;
         private boolean maxFuelReached;
         private double desiredPivotAngle;
+        private boolean autoKick;
     //Data
         private ShuffleboardTab IntakeIndexerSubsystemTab = Shuffleboard.getTab("Intake Indexer Subsystem Tab");
         private GenericEntry fuelDetectedIndexerEntry;
@@ -34,6 +36,11 @@ public class IntakeIndexSubsystem extends SubsystemBase {
         private GenericEntry maxFuelReachedEntry;
         private GenericEntry desiredPivotAngleEntry;
         private GenericEntry currentPivotAngleEntry;
+        private GenericEntry intake_kP;
+        private GenericEntry intake_kI;
+        private GenericEntry intake_kD;
+    //Sensors Intialization
+        Sensors sensors = new Sensors();
 
     public IntakeIndexSubsystem(){
 
@@ -42,6 +49,7 @@ public class IntakeIndexSubsystem extends SubsystemBase {
             fuelDetectedIntake = false;
             maxFuelReached = false;
             desiredPivotAngle = 0;
+            autoKick = true;
         
         //Initializing Shuffleboard Entries
             fuelDetectedIndexerEntry = IntakeIndexerSubsystemTab.add("Fuel Detected Indexer", false).getEntry();
@@ -49,6 +57,10 @@ public class IntakeIndexSubsystem extends SubsystemBase {
             maxFuelReachedEntry = IntakeIndexerSubsystemTab.add("Max Fuel Reached", false).getEntry();
             desiredPivotAngleEntry = IntakeIndexerSubsystemTab.add("Desired Pivot Angle", 0.0).getEntry();
             currentPivotAngleEntry = IntakeIndexerSubsystemTab.add("Current Pivot Angle", 0.0).getEntry();
+            intake_kP = IntakeIndexerSubsystemTab.add("INTAKE KP", pivotPID.getP()).getEntry();
+            intake_kI = IntakeIndexerSubsystemTab.add("INTAKE KI", pivotPID.getI()).getEntry();
+            intake_kD = IntakeIndexerSubsystemTab.add("INTAKE KD", pivotPID.getD()).getEntry();
+
     }
 
     //Utility Methods
@@ -77,39 +89,42 @@ public class IntakeIndexSubsystem extends SubsystemBase {
     //Command Based Methods
         
         public Command kick(){
-            return Commands.sequence(
-                Commands.runOnce(()->{
-                     if(fuelDetectedIndexer && (Constants.ShooterSubsystemConstants.desiredAngleReached && Constants.ShooterSubsystemConstants.desiredVelReached)){
-                        kickerMotor.set(Constants.IntakeIndexerSubsystemConstants.KICKER_SPEED);
-                    }
-                }),
-                Commands.waitUntil(()->!fuelDetectedIndexer),
-                Commands.runOnce(()->{
-                    kickerMotor.set(0);
-                })
-            );
+            if(!autoKick){
+                return Commands.sequence(
+                    Commands.runOnce(()->{
+                        if(fuelDetectedIndexer && (Constants.ShooterSubsystemConstants.desiredAngleReached && Constants.ShooterSubsystemConstants.desiredVelReached)){
+                            kickerMotor.set(Constants.IntakeIndexerSubsystemConstants.KICKER_SPEED);
+                        }
+                    }),
+                    Commands.waitUntil(()->!fuelDetectedIndexer),
+                    Commands.runOnce(()->{
+                        kickerMotor.set(0);
+                    })
+                );
+            }
+            return Commands.none();
         }
 
         public Command intakeCommand(){
-            return Commands.parallel(
-                Commands.runOnce(()->{
-                    intake();
-                }),
+            return Commands.sequence(
                 Commands.runOnce(()->{
                     if(!maxFuelReached && fuelDetectedIntake){
                         setDesired_Angle(Constants.IntakeIndexerSubsystemConstants.INTAKE_ANGLE);
                     }
+                }),
+                Commands.runOnce(()->{
+                    intake();
                 })
             );
         }
 
         public Command stowCommand(){
-            return Commands.parallel(
-                Commands.runOnce(()->{
-                    stopIntake();
-                }),
+            return Commands.sequence(
                 Commands.runOnce(()->{
                     setDesired_Angle(Constants.IntakeIndexerSubsystemConstants.STOW_ANGLE);
+                }),
+                Commands.runOnce(()->{
+                    stopIntake();
                 })
             );
         }
@@ -130,11 +145,21 @@ public class IntakeIndexSubsystem extends SubsystemBase {
             } else {
                 kickerMotor.set(0);
             }
+        //Update Tracker Variables
+            fuelDetectedIndexer = sensors.getIndexSensor();
+            fuelDetectedIntake = sensors.getIntakeSensor();
+            maxFuelReached = sensors.getHopperLimitSensor();
         //Data
             fuelDetectedIndexerEntry.setBoolean(fuelDetectedIndexer);
             fuelDetectedIntakeEntry.setBoolean(fuelDetectedIntake);
             maxFuelReachedEntry.setBoolean(maxFuelReached);
             desiredPivotAngleEntry.setDouble(desiredPivotAngle);
             currentPivotAngleEntry.setDouble(getIntakeAngle());
+        //Change PID Values
+            pivotPID.setPID(
+                intake_kP.getDouble(pivotPID.getP()), 
+                intake_kI.getDouble(pivotPID.getI()), 
+                intake_kD.getDouble(pivotPID.getD())
+            );
     }
 }

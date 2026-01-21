@@ -4,17 +4,17 @@ import edu.wpi.first.wpilibj.DigitalInput;
 import frc.robot.Constants;
 
 public class Sensors {
-    public static final DigitalInput indexSensor = new DigitalInput(Constants.LightSensor.INDEXER_SENSOR_ID);
-    public static final DigitalInput intakeSensor = new DigitalInput(Constants.LightSensor.INTAKE_SENSOR_ID);
-    public static final DigitalInput hopperSesnor = new DigitalInput(Constants.LightSensor.HOPPER_MAX_LIMIT_SENSOR_ID);
+    public final DigitalInput indexSensor = new DigitalInput(Constants.LightSensor.INDEXER_SENSOR_ID);
+    public final DigitalInput intakeSensor = new DigitalInput(Constants.LightSensor.INTAKE_SENSOR_ID);
+    public final DigitalInput hopperSesnor = new DigitalInput(Constants.LightSensor.HOPPER_MAX_LIMIT_SENSOR_ID);
 
-    public static boolean getIndexSensor() {
+    public boolean getIndexSensor() {
         return !indexSensor.get();
     }
-    public static boolean getIntakeSensor(){
+    public boolean getIntakeSensor(){
         return !intakeSensor.get();
     }
-    public static boolean getHopperLimitSensor(){
+    public boolean getHopperLimitSensor(){
         return !hopperSesnor.get();
     }
 }
