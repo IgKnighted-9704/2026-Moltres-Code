@@ -6,14 +6,34 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.button.CommandPS4Controller;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import frc.robot.commands.SwerveJoystickCommand;
+import frc.robot.subsystems.swervesubsystem.SwerveSubsystem;
 
 public class RobotContainer {
+  
+    //Subsystem Initialization
+      SwerveSubsystem drivebase = new SwerveSubsystem();
+
+    //Joystick Initialized
+      CommandXboxController mainX = new CommandXboxController(0);
+
+        SwerveJoystickCommand driveXCommand = new SwerveJoystickCommand(
+          drivebase,
+          () -> mainX.getLeftY(),
+          () -> -mainX.getLeftX(),
+          () -> -mainX.getRightX(),
+          false
+        );  
+
   public RobotContainer() {
+    drivebase.setDefaultCommand(driveXCommand);
     configureBindings();
   }
 
   private void configureBindings() {
-    
+     mainX.a().onTrue(Commands.runOnce(() -> drivebase.zeroGyroscope()));
   }
 
   public Command getAutonomousCommand() {

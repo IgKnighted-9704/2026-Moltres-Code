@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.Set;
 
 import org.json.simple.parser.ParseException;
+import org.opencv.core.Mat;
 
 import com.ctre.phoenix6.hardware.Pigeon2;
 
@@ -24,6 +25,7 @@ import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.Constants.SwerveConstants;
+import frc.robot.Constants.UtilMethods;
 import frc.robot.Constants.SwerveConstants.DriveConstants;
 import frc.robot.subsystems.utility.LimelightHelpers;
 
@@ -35,7 +37,7 @@ import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 public class SwerveSubsystem extends SubsystemBase {
 	private final SwerveModule frontLeftModule;
     private final SwerveModule frontRightModule;
-    private final SwerveModule backLeftModule;
+    public final SwerveModule backLeftModule;
     private final SwerveModule backRightModule;
     private Pigeon2 gyroscope;
 
@@ -78,6 +80,9 @@ public class SwerveSubsystem extends SubsystemBase {
         private GenericEntry DriveFFkS;
         private GenericEntry DriveFFkV;
         private GenericEntry DriveFFkA;
+
+        //tracker
+        private GenericEntry error;
 
     public SwerveSubsystem() {
 
@@ -143,8 +148,8 @@ public class SwerveSubsystem extends SubsystemBase {
                 RobotVelocity = SwerveSubsystemTracker.add("Robot Velocity", Math.hypot(getRobotVelocity().vxMetersPerSecond, getRobotVelocity().vyMetersPerSecond)).getEntry();
                 RobotHeading = SwerveSubsystemTracker.add("Robot Heading", getHeading()).getEntry();
             //Module Information
-                FrontRightModuleDriveVelocity = SwerveSubsystemTracker.add("Module Drive Velocity", frontRightModule.getDriveVelocity()).getEntry();
-                FrontRightModuleAngle = SwerveSubsystemTracker.add("Module Angle", Math.toDegrees(frontRightModule.getAngularPosition())).getEntry();
+                FrontRightModuleDriveVelocity = SwerveSubsystemTracker.add("Front Right Module Drive Velocity", frontRightModule.getDriveVelocity()).getEntry();
+                FrontRightModuleAngle = SwerveSubsystemTracker.add("FronModule Angle", Math.toDegrees(frontRightModule.getAngularPosition())).getEntry();
                 FrontLeftModuleDriveVelocity = SwerveSubsystemTracker.add("Front Left Module Drive Velocity", frontLeftModule.getDriveVelocity()).getEntry();
                 FrontLeftModuleAngle = SwerveSubsystemTracker.add("Front Left Module Angle", Math.toDegrees(frontLeftModule.getAngularPosition())).getEntry();
                 BackRightModuleDriveVelocity = SwerveSubsystemTracker.add("Back Right Module Drive Velocity", backRightModule.getDriveVelocity()).getEntry();
@@ -155,6 +160,7 @@ public class SwerveSubsystem extends SubsystemBase {
                 PoseEstimatorX = SwerveSubsystemTracker.add("Pose Estimator X", getPose().getX()).getEntry();
                 PoseEstimatorY = SwerveSubsystemTracker.add("Pose Estimator Y", getPose().getY()).getEntry();
                 PoseEstimatorRotation = SwerveSubsystemTracker.add("Pose Estimator Z", getPose().getRotation().getDegrees()).getEntry();
+                error = SwerveSubsystemTracker.add("error", backLeftModule.error).getEntry();
             //Pathplanner
                 //Translation
                 PathPlannerTranslationkP = SwerveSubsystemTracker
@@ -214,8 +220,8 @@ public class SwerveSubsystem extends SubsystemBase {
 
     //Utility Methods
         public static ChassisSpeeds toChassisSpeeds(double vx, double vy, double omega, boolean fieldRelative, SwerveSubsystem swerveSubsystem){
-            return fieldRelative ? ChassisSpeeds.fromFieldRelativeSpeeds(vx, vy, omega , swerveSubsystem.getRotation2d()) : 
-                                new ChassisSpeeds(vx, vy, omega);
+            return fieldRelative ? ChassisSpeeds.fromRobotRelativeSpeeds(vx, vy, omega , swerveSubsystem.getRotation2d()) : 
+                                ChassisSpeeds.fromFieldRelativeSpeeds(vx, vy, omega , swerveSubsystem.getRotation2d()) ;
         }
 
     //Swerve Data Acess
@@ -264,12 +270,27 @@ public class SwerveSubsystem extends SubsystemBase {
         }
     //Swerve Methods
         //Set Robot Speed
-        public void setModuleStates(SwerveModuleState[] desiredStates){
+        public void setModuleStates(SwerveModuleState[] desiredStates, double rotSpeed){
             SwerveDriveKinematics.desaturateWheelSpeeds(desiredStates, Constants.SwerveConstants.ModuleConstants.kPhysicalMaxSpeedMetersPerSecond);
-            frontLeftModule.setDesiredState(desiredStates[0]);
-            frontRightModule.setDesiredState(desiredStates[1]);
-            backLeftModule.setDesiredState(desiredStates[2]);
-            backRightModule.setDesiredState(desiredStates[3]);
+            if(Math.abs(rotSpeed) > 0){
+                desiredStates[0].angle = new Rotation2d(Math.toRadians(45));
+                desiredStates[0].speedMetersPerSecond = -rotSpeed;
+                desiredStates[1].angle = new Rotation2d(Math.toRadians(45));
+                desiredStates[1].speedMetersPerSecond = rotSpeed;
+                desiredStates[2].angle = new Rotation2d(Math.toRadians(135));
+                desiredStates[2].speedMetersPerSecond = rotSpeed;
+                desiredStates[3].angle = new Rotation2d(Math.toRadians(45));
+                desiredStates[3].speedMetersPerSecond = rotSpeed;
+                frontLeftModule.setDesiredState(desiredStates[0]);
+                frontRightModule.setDesiredState(desiredStates[1]);
+                backLeftModule.setDesiredState(desiredStates[2]);
+                backRightModule.setDesiredState(desiredStates[3]);
+            } else {
+                frontLeftModule.setDesiredState(desiredStates[0]);
+                frontRightModule.setDesiredState(desiredStates[1]);
+                backLeftModule.setDesiredState(desiredStates[2]);
+                backRightModule.setDesiredState(desiredStates[3]);
+            }
         }
         //Stop Robot
         public void stopModules(){
@@ -304,7 +325,7 @@ public class SwerveSubsystem extends SubsystemBase {
                             (speeds, feedforwards) -> this.setModuleStates(
                                 SwerveConstants.DriveConstants.kDriveKinematics.toSwerveModuleStates(
                                     toChassisSpeeds(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond, speeds.omegaRadiansPerSecond, false, this)
-                                )
+                                ),0
                             ), 
                             new PPHolonomicDriveController( 
                                     new PIDConstants(
@@ -374,16 +395,17 @@ public class SwerveSubsystem extends SubsystemBase {
                 RobotHeading.setDouble(getHeading());
             //Module Information
                 FrontRightModuleDriveVelocity.setDouble(frontRightModule.getDriveVelocity());
-                FrontRightModuleAngle.setDouble(frontRightModule.getAngularPosition());
+                FrontRightModuleAngle.setDouble(Math.IEEEremainder(frontRightModule.getAngularPosition(), Math.PI));
                 FrontLeftModuleDriveVelocity.setDouble(frontLeftModule.getDriveVelocity());
-                FrontLeftModuleAngle.setDouble(frontLeftModule.getAngularPosition());
+                FrontLeftModuleAngle.setDouble(Math.IEEEremainder(frontLeftModule.getAngularPosition(), Math.PI));
                 BackRightModuleDriveVelocity.setDouble(backRightModule.getDriveVelocity());
-                BackRightModuleAngle.setDouble(backRightModule.getAngularPosition());
+                BackRightModuleAngle.setDouble(Math.IEEEremainder(backRightModule.getAngularPosition(), Math.PI));
                 BackLeftModuleDriveVelocity.setDouble(backLeftModule.getDriveVelocity());
-                BackLeftModuleAngle.setDouble(backLeftModule.getAngularPosition());
+                BackLeftModuleAngle.setDouble(Math.IEEEremainder(backLeftModule.getAngularPosition(), Math.PI));
             //Pose Estimator
                 PoseEstimatorX.setDouble(getPose().getX());
                 PoseEstimatorY.setDouble(getPose().getY());
                 PoseEstimatorRotation.setDouble(getPose().getRotation().getDegrees());
+                error.setDouble(backLeftModule.error);
     }
 }

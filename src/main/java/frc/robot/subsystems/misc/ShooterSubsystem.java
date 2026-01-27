@@ -68,6 +68,7 @@ public class ShooterSubsystem extends SubsystemBase{
     //Tracker Variables
        private boolean enableSubsystem;
        private boolean enableVision;
+       private boolean buttonClicked;
        private double desired_Velocity;
        private double desired_Angle;
        private double target_distance;

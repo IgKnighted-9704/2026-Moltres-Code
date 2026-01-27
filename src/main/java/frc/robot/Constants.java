@@ -96,29 +96,26 @@ public class Constants {
             // Gear Ratios & Physical Constants
             public static final double kWheelDiameterMeters = Units.inchesToMeters(3);
             public static final double kPhysicalMaxSpeedMetersPerSecond = 3;
-            public static final double kPhysicalMaxAngularSpeedRadiansPerSecond = Math.PI;
+            public static final double kPhysicalMaxAngularSpeedRadiansPerSecond = 3 * Math.PI;
             public static final double kTeleDriveMaxAccelerationUnitsPerSecond = 10;
-            public static final double kTeleDriveMaxAngularAccelerationUnitsPerSecond = Math.PI;
+            public static final double kTeleDriveMaxAngularAccelerationUnitsPerSecond = 3 * Math.PI;
             public static final double kDriveMotorGearRatio = 4.71;
-            public static final double kAngleMotorGearRatio = 46.42;
+            public static final double kAngleMotorGearRatio = 1;
 
             // Conversion Factors
-            public static final double kDriveEncoderRot2Meters = (Math.PI * kWheelDiameterMeters)
-                    / kDriveMotorGearRatio;
-            public static final double kDriveEncoderRot2MetersPerSec = kDriveEncoderRot2Meters / 60;
-            public static final double kTurningEncoderRot2Rad = (Math.PI * kWheelDiameterMeters) / kAngleMotorGearRatio;
-            public static final double kTurningEncoderRot2RadPerSec = kTurningEncoderRot2Rad / 60;
+            public static final double kDriveEncoderRot2Meters = (2 * Math.PI * kWheelDiameterMeters) / kDriveMotorGearRatio;
+            public static final double kTurningEncoderRot2Rad = (Math.PI/180) / kAngleMotorGearRatio;
             // PID Values-Angle Motor
-            public static double kPTurning = 0.0;
+            public static double kPTurning = 0.035;
             public static double kITurning = 0.0;
             public static double kDTurning = 0.0;
             // PID Values-Drive Motor
-            public static double kPDriving = 0.2;
+            public static double kPDriving = 1; //1
             public static double kIDriving = 0.0;
             public static double kDDriving = 0.0;
             // Feedforward Values-Drive Motor
-            public static double kSDriving = 0.0;
-            public static double kVDriving = 0.0;
+            public static double kSDriving = 0;
+            public static double kVDriving = 1.1; //1.1
             public static double kADriving = 0.0;
         }
 
@@ -127,7 +124,7 @@ public class Constants {
             public static final int kFrontLeftDriveMotorPort = 2;
             public static final int kFrontLeftTurningMotorPort = 3;
             public static final boolean kFrontLeftDriveEncoderReversed = false;
-            public static final boolean kFrontLeftTurningEncoderReversed = true;
+            public static final boolean kFrontLeftTurningEncoderReversed = false;
             public static final double kFrontLeftDriveAbsoluteEncoderOffsetRad = 0.0;
             public static final boolean kFrontLeftDriveAbsoluteEncoderReversed = false;
 
@@ -143,7 +140,7 @@ public class Constants {
             public static final int kBackLeftDriveMotorPort = 6;
             public static final int kBackLeftTurningMotorPort = 7;
             public static final boolean kBackLeftDriveEncoderReversed = false;
-            public static final boolean kBackLeftTurningEncoderReversed = true;
+            public static final boolean kBackLeftTurningEncoderReversed = false;
             public static final double kBackLeftDriveAbsoluteEncoderOffsetRad = 0.0;
             public static final boolean kBackLeftDriveAbsoluteEncoderReversed = false;
 
@@ -156,7 +153,7 @@ public class Constants {
             public static final boolean kBackRightDriveAbsoluteEncoderReversed = false;
 
             // Gyroscope
-            public static final int kGyroPort = 0;
+            public static final int kGyroPort = 20;
 
             // Distance Between Wheels Horizontal
             public static final double kTrackWidth = Units.inchesToMeters(24.849);
@@ -189,6 +186,18 @@ public class Constants {
     public static final class UtilMethods{
         public static boolean checkTolerance(double desireState, double currentState, double tolerance){
             return ((desireState-currentState) < tolerance);
+        }
+
+        public static double normalizeDegrees(double degrees) {
+            degrees = degrees % 360;
+
+            if (degrees > 180) {
+                degrees -= 360;
+            } else if (degrees <= -180) {
+                degrees += 360;
+            }
+
+            return degrees;
         }
     }
 }

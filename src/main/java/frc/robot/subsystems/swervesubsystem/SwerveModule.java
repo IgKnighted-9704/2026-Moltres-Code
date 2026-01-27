@@ -1,7 +1,8 @@
 package frc.robot.subsystems.swervesubsystem;
 
+import org.opencv.core.Mat;
+
 import com.ctre.phoenix6.hardware.TalonFX;
-import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkAbsoluteEncoder;
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
@@ -20,10 +21,13 @@ public class SwerveModule{
     
     //Drive & Angle Encoders
     private final SparkAbsoluteEncoder angleEncoder;
-    private final RelativeEncoder driveEncoder;
+
+    //Tracker
+    public double targetAngle;
+    public double error;
 
     private final boolean angleMotorReversed;
-     private final double angleMotorOffsetRot;
+    private final double angleMotorOffsetRot;
     private final boolean driveMotorReversed;
 
     private PIDController anglePIDController;
@@ -36,7 +40,6 @@ public class SwerveModule{
         this.angleMotorOffsetRot = angleMotorOffsetRot;
 
         this.angleEncoder = angleMotor.getAbsoluteEncoder(); //Spark Absolute Encoder - Neo
-        this.driveEncoder = angleMotor.getEncoder(); //Spark Relative Encoder - Kraken
 
         this.angleMotorReversed = angleMotorReversed;
         this.driveMotorReversed = driveMotorReversed;
@@ -57,29 +60,26 @@ public class SwerveModule{
         //Rather then using the max and min input range as constraints, it considers them to be the same point and automatically calculates the shortest route to the setpoint.
         anglePIDController.enableContinuousInput(-Math.PI, Math.PI);
         resetEncoders();
-
+     targetAngle = 0;
     }
 
     public double getDrivePosition(){
-        return driveMotorReversed ? driveEncoder.getPosition() * -1 * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2Meters :
-                                   driveEncoder.getPosition() * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2Meters;
+        return driveMotorReversed ? driveMotor.getPosition().getValueAsDouble() * -1 * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2Meters :
+                                   driveMotor.getPosition().getValueAsDouble() * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2Meters;
     }
 
     public double getAngularPosition(){
-        return angleMotorReversed ? 
-        -1 * (angleEncoder.getPosition() - angleMotorOffsetRot) * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2Rad : 
-        (angleEncoder.getPosition() - angleMotorOffsetRot) * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2Rad;
+        return (angleEncoder.getPosition() - angleMotorOffsetRot) * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2Rad;
     }
 
     public double getDriveVelocity(){
-        return driveMotorReversed ? driveEncoder.getVelocity() * -1 * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2MetersPerSec :
-                                   driveEncoder.getVelocity() * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2MetersPerSec;
+        return driveMotorReversed ? driveMotor.getVelocity().getValueAsDouble() * -1 * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2Meters :
+                                   driveMotor.getVelocity().getValueAsDouble() * Constants.SwerveConstants.ModuleConstants.kDriveEncoderRot2Meters;
     }
 
     public double getAngularVelocity(){
-        return angleMotorReversed ? 
-        -1 * angleEncoder.getVelocity() * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2RadPerSec : 
-        angleEncoder.getVelocity() * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2RadPerSec;
+        return 
+        angleEncoder.getVelocity() * Constants.SwerveConstants.ModuleConstants.kTurningEncoderRot2Rad;
     }
 
    public SwerveModuleState getState(){
@@ -114,7 +114,7 @@ public class SwerveModule{
    }
 
     public void resetEncoders(){
-        driveEncoder.setPosition(0);
+        driveMotor.setPosition(0);
     }
    public void setDesiredState(SwerveModuleState state){
         if(Math.abs(state.speedMetersPerSecond) < 0.001){
@@ -124,9 +124,17 @@ public class SwerveModule{
         state.optimize(getState().angle);
             double totalSpeed = drivePIDController.calculate(getDriveVelocity(), state.speedMetersPerSecond) + 
                                 driveFeedforward.calculate(state.speedMetersPerSecond);
-            double targetAngle = Math.IEEEremainder(state.angle.getRadians(), 2 * Math.PI);
+            double targetAngle = Math.IEEEremainder(state.angle.getRadians(), Math.PI);
+            this.targetAngle = targetAngle;
         driveMotor.setVoltage(totalSpeed);
-        angleMotor.setVoltage(anglePIDController.calculate(getAngularPosition(),targetAngle));
+     //    angleMotor.setVoltage(anglePIDController.calculate(getAngularPosition(),targetAngle));
+        double output = anglePIDController.calculate(getAngularPosition(),targetAngle);
+        error = Math.abs(targetAngle)  - Math.abs(Math.IEEEremainder(getAngularPosition(), Math.PI));
+        if(Math.abs(error) < Math.toRadians(10)){
+          angleMotor.setVoltage(0);
+        } else {
+          angleMotor.set(output);
+        }
    }
 
    public void stop(){
